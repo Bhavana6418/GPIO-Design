@@ -1,0 +1,226 @@
+`define GPIO_RGPIO_IN 32'h0    //Base + 0*0
+`define GPIO_RGPIO_OUT 32'h4 	//Base + 0*4
+`define GPIO_RGPIO_OE 32'h8	//Base + 0*8
+`define GPIO_RGPIO_INTE 32'hc	//Base + 0*c
+`define GPIO_RGPIO_PTRIG 32'ha	//Base + 0*10
+`define GPIO_RGPIO_AUX 32'he	//Base + 0*14
+`define GPIO_RGPIO_CTRL 32'h18	//Base + 0*18
+`define GPIO_RGPIO_INTS 32'h1c	//Base + 0*1c
+`define GPIO_RGPIO_ECLK 32'h20	//Base + 0*20
+`define GPIO_RGPIO_NEC 32'h24	//Base + 0*24
+`define GPIO_RGPIO_CTRL_INTE 0
+`define GPIO_RGPIO_CTRL_INTS 1
+
+module gpio_reg(input sys_clk,sys_rstn,gpio_we,gpio_eclk,
+		input [31:0] gpio_addr,gpio_data_i,aux_out,in_pad_i,
+		output [31:0] out_pad_o,oen_padoe_n,
+		output reg [31:0] gpio_data_o,
+		output reg gpio_inta_o);
+
+reg [31:0] rgpio_in,rgpio_out,rgpio_oe,rgpio_inte,rgpio_ptrig,rgpio_aux,rgpio_ints,rgpio_eclk,rgpio_nec;
+reg [1:0] rgpio_ctrl;
+reg [31:0]data_reg;
+
+reg [31:0] pextc_sampled,nextc_sampled;
+
+wire [31:0] extc_in;
+assign extc_in=(~rgpio_nec & pextc_sampled) | (rgpio_nec & nextc_sampled);
+
+wire [31:0] in_mux;
+assign in_mux=(rgpio_eclk & extc_in) | (~rgpio_eclk & in_pad_i); 
+
+//------------------------PEXTC_SAMPLED----------------------------//
+
+always@(posedge gpio_eclk or negedge sys_rstn)
+begin
+	if(!sys_rstn)
+		pextc_sampled<=32'b0;
+	else
+		pextc_sampled<=in_pad_i;
+end
+
+//------------------------NEXTC_SAMPLED----------------------------//
+
+always@(negedge gpio_eclk or negedge sys_rstn)
+begin
+	if(!sys_rstn)
+		nextc_sampled<=32'b0;
+	else
+		nextc_sampled<=in_pad_i;
+end
+
+//------------------------RGPIO_IN----------------------------//
+
+always@(posedge sys_clk or negedge sys_rstn)
+begin
+	if(!sys_rstn)
+		rgpio_in<=32'b0;
+	else if(gpio_addr==`GPIO_RGPIO_IN && gpio_we)
+		rgpio_in<=in_mux;
+end
+
+//------------------------RGPIO_OUT----------------------------//
+
+always@(posedge sys_clk or negedge sys_rstn)
+begin
+	if(!sys_rstn)
+		rgpio_out<=32'b0;
+	else if(gpio_addr==`GPIO_RGPIO_OUT && gpio_we)
+		rgpio_out<=gpio_data_i[31:0];
+	else
+		rgpio_out<=rgpio_out;
+end
+
+//------------------------RGPIO_OE----------------------------//
+
+always@(posedge sys_clk or negedge sys_rstn)
+begin
+	if(!sys_rstn)
+		rgpio_oe<=32'b0;
+	else if(gpio_addr==`GPIO_RGPIO_OE && gpio_we)
+		rgpio_oe<=gpio_data_i[31:0];
+	else
+		rgpio_oe<=rgpio_oe;
+end
+
+//------------------------RGPIO_INTE----------------------------//
+
+always@(posedge sys_clk or negedge sys_rstn)
+begin
+	if(!sys_rstn)
+		rgpio_inte<=32'b0;
+	else if(gpio_addr==`GPIO_RGPIO_INTE && gpio_we)
+		rgpio_inte<=gpio_data_i[31:0];
+	else
+		rgpio_inte<=rgpio_inte;
+end
+
+//------------------------RGPIO_PTRIG----------------------------//
+
+always@(posedge sys_clk or negedge sys_rstn)
+begin
+	if(!sys_rstn)
+		rgpio_ptrig<=32'b0;
+	else if(gpio_addr==`GPIO_RGPIO_PTRIG && gpio_we)
+		rgpio_ptrig<=gpio_data_i[31:0];
+	else 
+		rgpio_ptrig<=rgpio_ptrig;
+end
+
+//------------------------RGPIO_AUX----------------------------//
+
+always@(posedge sys_clk or negedge sys_rstn)
+begin
+	if(!sys_rstn)
+		rgpio_aux<=32'b0;
+	else if(gpio_addr==`GPIO_RGPIO_AUX && gpio_we)
+		rgpio_aux<=gpio_data_i[31:0];
+	else
+		rgpio_aux<=rgpio_aux;
+end
+
+//------------------------RGPIO_INTS----------------------------//
+
+always@(posedge sys_clk or negedge sys_rstn)
+begin
+	if(!sys_rstn)
+		rgpio_ints<=32'b0;
+	else if(gpio_addr==`GPIO_RGPIO_INTS && gpio_we)
+		rgpio_ints<=gpio_data_i[31:0];
+	/*else if(rgpio_ints[`GPIO_RGPIO_CTRL_INTE])
+		rgpio_ints<=(rgpio_ints | ((rgpio_in^in_mux) & (rgpio_ptrig~^in_mux) & rgpio_inte));*/
+	else if(rgpio_ctrl[0])
+		rgpio_ints<=rgpio_ints | ((rgpio_inte) & (in_mux^rgpio_in) & (!in_mux^rgpio_ptrig));
+	else
+		rgpio_ints<=rgpio_ints;
+end
+
+//------------------------RGPIO_ECLK----------------------------//
+
+always@(posedge sys_clk or negedge sys_rstn)
+begin
+	if(!sys_rstn)
+		rgpio_eclk<=32'b0;
+	else if(gpio_addr==`GPIO_RGPIO_ECLK && gpio_we)
+		rgpio_eclk<=gpio_data_i[31:0];
+	else 
+		rgpio_eclk<=rgpio_eclk;
+end
+
+//------------------------RGPIO_NEC----------------------------//
+
+always@(posedge sys_clk or negedge sys_rstn)
+begin
+	if(!sys_rstn)
+		rgpio_nec<=32'b0;
+	else if(gpio_addr==`GPIO_RGPIO_NEC && gpio_we)
+		rgpio_nec<=gpio_data_i[31:0];
+	else
+		rgpio_nec<=rgpio_nec;
+end
+
+//------------------------RGPIO_CTRL----------------------------//
+
+always@(posedge sys_clk or negedge sys_rstn)
+begin
+	if(!sys_rstn)
+		rgpio_ctrl<=2'b0;
+	else if((gpio_addr==`GPIO_RGPIO_CTRL) && gpio_we)
+		rgpio_ctrl<=gpio_data_i[1:0];
+/*	else if(rgpio_ctrl[`GPIO_RGPIO_CTRL_INTE])
+		rgpio_ctrl[`GPIO_RGPIO_CTRL_INTS]<=rgpio_ctrl[`GPIO_RGPIO_CTRL_INTS] || gpio_inta_o;*/
+	else if(rgpio_ctrl[`GPIO_RGPIO_CTRL_INTE])
+		rgpio_ctrl<={(rgpio_ctrl[`GPIO_RGPIO_CTRL_INTS] | gpio_inta_o),rgpio_ctrl[`GPIO_RGPIO_CTRL_INTE]};
+	else
+		rgpio_ctrl<=rgpio_ctrl;
+end
+
+// -----------------logic for read operation-----------------
+
+always@(*)
+begin
+	case(gpio_addr)
+		`GPIO_RGPIO_IN : data_reg = rgpio_in;
+		`GPIO_RGPIO_OUT : data_reg = rgpio_out;
+		`GPIO_RGPIO_OE : data_reg = rgpio_oe;
+		`GPIO_RGPIO_INTE : data_reg = rgpio_inte;
+		`GPIO_RGPIO_PTRIG : data_reg = rgpio_ptrig;
+		`GPIO_RGPIO_NEC : data_reg = rgpio_nec;
+		`GPIO_RGPIO_ECLK : data_reg = rgpio_eclk;
+		`GPIO_RGPIO_AUX : data_reg = rgpio_aux;
+		`GPIO_RGPIO_CTRL : data_reg = rgpio_ctrl;
+		`GPIO_RGPIO_INTS : data_reg = rgpio_ints;
+		default : data_reg = rgpio_in;
+	endcase
+end
+
+//--------------------gpio data output logic-----------------
+
+always@(posedge sys_clk or negedge sys_rstn)
+begin
+	if(!sys_rstn)
+		gpio_data_o<=32'b0;
+	else
+		gpio_data_o<=data_reg;
+
+end
+
+//-------------------generate interrupt req logic--------------
+
+//assign gpio_inta_o= |rgpio_ints ? rgpio_ctrl[`GPIO_RGPIO_CTRL_INTE] : 1'b0;
+always@(*)
+begin
+	if(|rgpio_ints)
+		gpio_inta_o<=rgpio_ctrl[`GPIO_RGPIO_CTRL_INTE];
+	else
+		gpio_inta_o<=1'b0;
+end
+
+
+//-------------------generate gpio output logic----------------
+
+assign out_pad_o=(rgpio_out & (~rgpio_aux)) | (rgpio_aux & aux_out);
+
+assign oen_padoe_n=rgpio_oe;
+
+endmodule

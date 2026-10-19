@@ -1,0 +1,175 @@
+module apb_slave_if_tb();
+	reg pclk,prstn,psel,penable,pwrite,gpio_inta_o;
+	reg [31:0] pwdata;
+	reg [31:0] paddr;
+	wire sys_clk,sys_rstn,irq;
+	wire pready;
+	wire gpio_we;
+	wire [31:0] gpio_addr;
+	wire [31:0] prdata;
+	wire [31:0] gpio_data_i;
+	reg [31:0] gpio_data_o;
+
+apb_slave_if DUT(pclk,prstn,psel,penable,pwrite,gpio_inta_o,pwdata,paddr,sys_clk,sys_rstn,irq,pready,gpio_we,gpio_addr,prdata,gpio_data_i,gpio_data_o);
+
+initial
+begin
+	pclk=1'b0;
+	forever #5 pclk=~pclk;
+end
+
+task reset();
+	begin
+	//	repeat(2)
+	//	begin
+		@(negedge pclk)
+		prstn=1'b0;
+		@(negedge pclk)
+		prstn=1'b1;
+		end
+//	end
+endtask
+
+task initialize();
+	begin
+		{psel,penable,pwrite,pwdata,paddr,gpio_data_o,gpio_inta_o}=0;
+	end
+endtask
+
+task select(input sel);
+	begin
+	//	@(negedge pclk)
+		psel=sel;
+	end
+endtask
+
+task enable(input penb);
+	begin
+	//	@(negedge pclk)
+		penable=penb;
+	end
+endtask
+
+task write(input wrt);
+	begin
+	//	@(negedge pclk)
+		pwrite=wrt;
+	end
+endtask
+
+task addr(input [31:0] a);
+	begin
+	//	@(negedge pclk)
+		paddr=a;
+	end
+endtask
+
+task data(input [31:0] i,j);
+	begin
+	//	@(negedge pclk)
+		pwdata=i;
+		gpio_data_o=j;
+	end
+endtask
+
+task intr(input inta);
+	begin
+	//	@(negedge pclk)
+		gpio_inta_o=inta;
+	end
+endtask
+
+initial
+begin
+			$dumpfile("waves.apb");
+         		$dumpvars(0,apb_slave_if_tb);
+end
+
+initial
+begin
+	reset;
+	initialize;
+
+//idle state
+
+	select(1'b0);
+	enable(1'b0);
+	write(1'b0);
+	addr(4'd0);
+	data(32'd0,32'd0);
+	intr(1'b0);
+	
+//setup state
+	#15;
+	
+	select(1'b1);
+	enable(1'b0);
+	write(1'b1);
+	addr(4'd1);
+	data(32'haaaaaaaa,32'h55555555);
+	intr(1'b0);
+
+//access phase ------- write
+	#15;
+	
+	enable(1'b1);
+
+//back to idle
+	#15;
+	select(1'b0);
+	enable(1'b0);
+
+//------------- read transfer---------------
+
+	#15;
+	select(1'b1);
+	enable(1'b0);
+	write(1'b0);
+	addr(4'd2);
+
+	enable(1'b1);  //access
+	
+	//idle
+	#15;
+	select(1'b0);
+	enable(1'b0);
+/*
+//-----------Address cov----------------
+addr(4'd0);
+addr(4'd3);
+addr(4'd7);
+addr(4'd15);
+
+//----------data toggle---------------
+data(32'h00000000,32'hffffffff);
+data(32'hffffffff,32'h00000000);
+data(32'haaaaaaaa,32'h55555555);
+
+//interrupt toggle
+intr(1'b0);
+intr(1'b1);
+intr(1'b0);
+
+//--------------random data------------------
+	repeat(30)
+			begin
+				select($random);
+				enable($random);
+				write($random);
+				addr($random % 16);
+				data($random,$random);
+				intr($random);
+				#10;
+			end
+
+*/
+	#100;
+	$finish;
+
+end
+
+initial
+	$monitor("pclk=%d,prstn=%d,psel=%d,penable=%d,pwrite=%d,gpio_inta_o=%d,pwdata=%h,paddr=%d,irq=%d,pready=%d,gpio_we=%d,gpio_addr=%d,prdata=%h,gpio_data_i=%h,gpio_data_o=%h",pclk,prstn,psel,penable,pwrite,gpio_inta_o,pwdata,paddr,irq,pready,gpio_we,gpio_addr,prdata,gpio_data_i,gpio_data_o);
+
+
+endmodule

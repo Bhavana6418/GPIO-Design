@@ -1,0 +1,153 @@
+module io_if_tb();
+reg [31:0] out_pad_o,oen_padoe_n;
+wire [31:0] in_pad_i;
+wire [31:0] io_pad;
+integer i;
+
+//reg [31:0]temp;
+//reg dir;
+
+io_if DUT(out_pad_o,oen_padoe_n,in_pad_i,io_pad);
+
+initial
+begin
+	{out_pad_o,oen_padoe_n}=0;
+end
+
+/*
+//tristate drive
+
+assign io_pad=dir?temp:32'hz;
+
+
+task inputs(input [31:0] t,o,input d);
+	begin
+		temp=t;
+		oen_padoe_n=o;
+		dir=d;
+	end
+endtask
+
+task outputs(input [31:0]a,b,input c);
+	begin
+		out_pad_o=a;
+		oen_padoe_n=b;
+		dir=c;
+	end
+endtask
+
+task pureoutput(input [31:0]a,b,input c);
+	begin
+		out_pad_o=a;
+		oen_padoe_n=b;
+		dir=c;
+	end
+endtask
+
+task in_out(input [31:0]x,y,z,input c);
+	begin
+		out_pad_o=x;
+		oen_padoe_n=y;
+		temp=c;
+				
+		dir=z;
+				
+	end
+endtask
+*/
+
+initial
+begin
+			$dumpfile("waves.io");
+         		$dumpvars(0,io_if_tb);
+end
+
+
+
+initial
+begin
+	for(i=0;i<32;i=i+1)
+	begin
+		out_pad_o=$random;
+		oen_padoe_n=$random;
+	#10;
+	end
+	#100 $finish;
+end
+
+/*
+task t_temp;
+	begin
+		temp=32'h00000000;  #10;
+		temp=32'hffffffff;  #10;
+		temp=32'haaaaaaaa;  #10;
+		temp=32'h55555555;  #10;
+	end
+endtask
+
+task t_dir;
+	begin
+		dir=0;  #10;
+		dir=1;  #10;
+		dir=0;  #10;
+		dir=1;  #10;
+	end
+endtask
+
+task oen;
+	begin
+		oen_padoe_n=0; #10;
+		oen_padoe_n=1; #10;
+		oen_padoe_n=0; #10;
+	end
+endtask
+
+initial
+begin
+	out_pad_o=32'b0;
+	oen_padoe_n=1'b0;
+	temp=32'b0;
+	dir=1'b0;
+
+	t_dir;
+	oen;
+
+	dir=1;
+	t_temp;
+
+	dir=0;
+	t_temp;
+
+	repeat(25)
+	begin
+		out_pad_o=$random;
+		oen_padoe_n=$random;
+		temp=$random;
+		dir=$random;
+		#10;
+	end
+
+	
+	initial
+		begin
+		
+			inputs(32'd5,32'd0,1'd1);
+			#15;
+			outputs(32'd7,32'd6,1'd0);
+			#15;
+			pureoutput(32'd20,32'hffffffff,1'b0);
+			#15;
+			in_out(32'd15,32'hfffffff,32'd5,1'd1);
+
+
+ 	
+		#200;
+		$finish;	
+		
+		end*/
+
+
+initial 
+	$monitor("out_pad_o=%0b, oen_padoe_n=%0b, in_pad_i=%0b, io_pad=%0b",out_pad_o,oen_padoe_n,in_pad_i,io_pad);
+
+endmodule

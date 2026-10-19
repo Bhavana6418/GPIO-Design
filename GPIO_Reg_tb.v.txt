@@ -1,0 +1,228 @@
+module gpio_reg_tb();
+		reg sys_clk,sys_rstn,gpio_we,gpio_eclk;
+		reg [31:0] gpio_addr,gpio_data_i,aux_out,in_pad_i;
+		wire [31:0] out_pad_o,oen_padoe_n;
+		wire [31:0] gpio_data_o;
+		wire gpio_inta_o;
+
+gpio_reg DUT(sys_clk,sys_rstn,gpio_we,gpio_eclk,gpio_addr,gpio_data_i,aux_out,in_pad_i,out_pad_o,oen_padoe_n,gpio_data_o,gpio_inta_o);
+
+initial
+begin
+	sys_clk=1'b0;
+	forever #5 sys_clk=~sys_clk;
+end
+
+initial
+begin
+	gpio_eclk=1'b0;
+	forever #10 gpio_eclk=~gpio_eclk;
+end
+
+task reset();
+	begin
+		repeat(2)
+		begin
+		@(negedge sys_clk)
+		sys_rstn=1'b0;
+		@(negedge sys_clk)
+		sys_rstn=1'b1;
+	end
+	end
+endtask
+
+
+task write(input [31:0] addr,data);
+	begin
+		@(negedge sys_clk)
+		gpio_addr=addr;
+		gpio_data_i=data;
+		gpio_we=1'b1;
+		@(negedge sys_clk)
+		gpio_we=1'b0;
+	
+	end
+endtask
+
+task read(input [31:0] addr);
+	begin
+		@(negedge sys_clk)
+		gpio_addr=addr;
+		gpio_we=1'b0;
+	end
+endtask
+
+
+task cntrl(input [31:0] a,b, input c);
+	begin
+		gpio_addr=a;
+		gpio_we=c;
+		gpio_data_i=b;
+	end
+endtask
+
+task aux1(input [31:0] a);
+	begin
+		aux_out=a;
+	end
+endtask
+
+
+
+initial
+begin
+			$dumpfile("waves.reg");
+         		$dumpvars(0,gpio_reg_tb);
+end
+
+initial
+begin
+	reset;
+	
+	gpio_we=0;
+	gpio_addr=0;
+	gpio_data_i=0;
+	aux_out=0;
+	in_pad_i=0;
+	gpio_eclk=0;
+
+/*
+//============================*********as input************==============================//
+
+	
+	write(32'h4,32'd66);//addr(4)rgpio_out------------>gpio_data_i =to= out_pad_o;
+//	#15;
+	write(32'he,32'd77);//addr(e)rgpio_aux------------>aux_i	  =to= out_pad_o;
+	aux1(32'd11);//aux_i
+//	#15;
+
+
+//==============================***********as output***********==============================//
+
+	in_pad_i=32'd7;	
+	write(32'h0,32'hff);//reading rgpio_in
+//	#15;
+
+
+//=============================********interrupt************==============================//
+
+
+	in_pad_i = 32'h12345678;
+	cntrl(32'h18,2'd1,1'b1);//ctrl inte enable   
+//	#15;
+	write(32'hc,32'hff);//rgpio_inte
+	write(32'ha,32'hff);//rgpio_ptrig
+	
+	in_pad_i=32'd7;
+	
+		
+*/
+//==========================*********external clk********=======================
+	
+	write(32'h8,32'h0);
+	write(32'h24,32'h00000000);//rgpio_nec
+	write(32'h20,32'hffffffff);//rgpio_eclk
+	in_pad_i=32'd7;
+	write(32'h0,32'hff);//reading rgpio_in
+	
+
+
+
+/*
+
+	write(32'h8,32'hffffffff);//oe enabled
+	//aux1(32'h99);//aux_in input
+	//write1(32'he,32'hffffffff);//setting rgpio_aux as 1
+	write(32'h4,32'h86);// sending data to rgpio_out reg 
+	write(32'hc,32'h0);//setting interrupt low
+	
+
+
+	
+	//AS INPUT without rgpio_eclk
+	write(32'h8,32'h0);//oe disabled
+	write(32'h3,32'h0);//rgpio_ctrl disabled
+	write(32'hc,32'h0);//rgpio_inte disabled
+	in_pad_i=32'h88;
+	write(32'h20,32'h0);//setting rgpio_eclk
+	write(32'h24,32'h0);//rgpio_nec
+	
+
+//AS INPUT with rgpio_eclk with neg edge clk
+	in_pad_i=32'h56;
+
+        write(32'h20,32'hf0f0f0f0);//setting rgpio_eclk//here doubt how it is happening if we give f0f0f0f0f
+	@(negedge sys_clk)
+
+	write(32'h8,32'h0);//oe disabled
+	@(negedge sys_clk)
+
+		//write1(32'h20,32'hffffffff);//setting rgpio_eclk//here doubt how it is happening if we give f0f0f0f0f
+	//@(negedge sys_clk)
+
+	write(32'h3,32'h0);//rgpio_ctrl disabled
+	@(negedge sys_clk)
+
+
+	
+	write(32'hc,32'h0);//rgpio_inte disabled
+	@(negedge sys_clk)
+	
+       
+
+
+//Bidirectional
+		in_pad_i=32'h56;
+		
+	
+	write(32'h20,32'hffffffff);//setting rgpio_eclk
+	@(negedge sys_clk)
+
+	write(32'h8,32'hf0f0f0f0);//oe toggled
+		@(negedge sys_clk)
+
+	write(32'h4,32'h86);// sending data to rgpio_out reg 
+	@(negedge sys_clk)
+
+	write(32'h3,32'h0);//rgpio_ctrl disabled
+	@(negedge sys_clk)
+
+	write(32'hc,32'h0);//rgpio_inte disabled
+	@(negedge sys_clk)
+
+	write(32'h10,32'h0);//ptrig is disabled
+	@(negedge sys_clk)
+
+	read(32'h0);//rgpio_in
+	@(negedge sys_clk)
+
+
+	write(32'h24,32'h0);//rgpio_nec
+	
+	
+	
+
+
+	repeat(50)
+	begin
+		#10;
+		write($random,$random);
+		read($random);
+		cntrl($random,$random,$random);
+		aux1($random);
+		in_pad_i=$random;
+		//addr($random);
+	end
+
+	*/
+//-----------
+
+	#50 $finish;
+end
+
+initial
+	$monitor("sys_clk=%h,sys_rstn=%h,gpio_we=%h,gpio_eclk=%h,gpio_addr=%h,gpio_data_i=%h,aux_out=%h,in_pad_i=%h,out_pad_o=%h,oen_padoe_n=%h,gpio_data_o=%h,gpio_inta_o=%h",sys_clk,sys_rstn,gpio_we,gpio_eclk,gpio_addr,gpio_data_i,aux_out,in_pad_i,out_pad_o,oen_padoe_n,gpio_data_o,gpio_inta_o);
+
+
+
+endmodule

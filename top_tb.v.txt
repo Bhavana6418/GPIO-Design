@@ -1,0 +1,247 @@
+module top_tb();
+
+	   reg pclk,prstn,psel,penable,pwrite,ext_clk_pad_i;
+	   reg [31:0] paddr,pwdata,aux_in;
+	   wire pready,irq;
+	   wire [31:0] prdata;
+	   wire [31:0] io_pad;
+
+top DUT(pclk,prstn,psel,penable,pwrite,ext_clk_pad_i,paddr,pwdata,aux_in,pready,irq,prdata,io_pad);
+
+//generation of pclk
+initial 
+begin
+		pclk=1'b0;
+	forever #5 pclk=~pclk;
+end
+
+
+//generation of external clk
+initial
+begin
+	ext_clk_pad_i=1'b0;
+	forever #7 ext_clk_pad_i=~ext_clk_pad_i;
+end
+
+//task for reset
+
+task reset;
+	begin	
+	//repeat()
+//begin
+		@(negedge pclk)
+		prstn=1'b0;
+		@(negedge pclk)
+		prstn=1'b1;
+//	end
+end
+endtask
+
+//initialize all input to zero
+task initialize;
+	begin
+		@(negedge pclk)
+		psel=0;
+		pwrite=0;
+		penable=0;
+		paddr=0;
+		pwdata=0;
+		aux_in=0;
+	end
+endtask
+
+//auxilary inputs for gpio core
+task aux_write(input [31:0] in);
+	begin
+		@(negedge pclk)
+		aux_in=in;
+	end
+endtask
+
+//write into register as per apb protocol
+task apb_write(input [31:0] addr,in);
+begin
+		@(negedge pclk)
+		paddr=addr;
+		psel=1'b1;
+		pwrite=1'b1;
+		penable=1'b0;
+		pwdata=in;
+
+		@(negedge pclk)
+		paddr=addr;
+		psel=1'b1;
+		pwrite=1'b1;
+		penable=1'b1;
+		pwdata=in;
+
+		@(negedge pclk)
+		paddr=addr;
+		psel=1'b1;
+		pwrite=1'b1;
+		penable=1'b0;
+		pwdata=in;
+
+		@(negedge pclk)
+		paddr=addr;
+		psel=1'b0;
+		pwrite=1'b1;
+		penable=1'b0;
+		pwdata=in;
+	end
+endtask
+
+//read from the registers as per the apb protocol
+task apb_read(input [31:0] addr);
+	begin
+		@(negedge pclk)
+		paddr=addr;
+		psel=1'b1;
+		pwrite=1'b0;
+		penable=1'b0;
+		
+		@(negedge pclk)
+		paddr=addr;
+		psel=1'b1;
+		pwrite=1'b0;
+		penable=1'b1;
+		
+		@(negedge pclk)
+		paddr=addr;
+		psel=1'b1;
+		pwrite=1'b0;
+		penable=1'b0;
+		
+		@(negedge pclk)
+		paddr=addr;
+		psel=1'b0;
+		pwrite=1'b0;
+		penable=1'b0;
+	end
+endtask
+
+//io interface as bidirectional
+
+reg io_dir=1'b1; //used s input
+reg [31:0] temp=32'bz;
+
+//io_pad inputs
+task io_pad_inputs(input [31:0]in_temp);
+	begin
+		io_dir=1'b0;
+		temp=in_temp;
+	end
+endtask
+
+//io_pad outputs
+task io_pad_outputs;
+	begin
+		io_dir=1'b1;
+	end
+endtask
+
+assign io_pad=~io_dir?temp:32'bz;
+
+initial
+begin
+			$dumpfile("waves.top");
+         		$dumpvars(0,top_tb);
+end
+
+//assigning inputs
+initial
+begin
+	reset;
+	initialize;
+	
+	
+	//general purpose I/O driven by auxilary input
+	aux_write(32'hf7f6f504);
+	apb_write(32'he,32'hffffffff);
+	apb_write(32'h8,32'hffffffff);
+	io_pad_outputs;
+	apb_write(32'he,32'b0);
+
+
+	//general purpose as output
+	apb_write(32'hc,32'h0);
+	apb_write(32'h4,32'h56781234);
+	apb_write(32'h8,32'hffffffff);
+	io_pad_outputs;
+
+
+	//general purpose I/O as polled inputs (system clock)
+	apb_write(32'h8,32'h0); //I/O as input
+	apb_write(32'h18,2'b00); //interrupt disabled
+	apb_write(32'hc,32'b0);
+	apb_write(32'h20,32'h0);
+	apb_write(32'he,32'h0);
+	io_pad_inputs(32'h12345678);
+	apb_write(32'h0,32'hff);
+	apb_read(32'h0);
+
+/*	//general purpose I/O as polled inputs (external clock)
+	apb_write(32'h8,32'h0); //I/O as input
+	apb_write(32'h18,2'b00); //interrupt disabled
+	apb_write(32'hc,32'b0);
+	apb_write(32'h20,32'hffffffff);
+	apb_write(32'h24,32'hffffffff);
+	io_pad_inputs(32'h12345678);
+	apb_write(32'h0,32'hff);
+		//io_pad_outputs;
+	apb_read(32'h0);*/
+
+
+	//general purpose I/O as Bi-Directional I/o (sysytem clock)
+	apb_write(32'hc,32'h0);
+	apb_write(32'h20,32'h0);
+	apb_write(32'h4,32'h5555_1111); //output
+	apb_write(32'h8,32'hffff_0000);
+	io_pad_inputs(32'h4444_6666); 
+	io_pad_outputs;//input
+	apb_write(32'h0,32'hff);
+	apb_read(32'h0);
+	apb_read(32'h4);
+
+	//general purpose I/O as interrupt mode
+	apb_write(32'h8,32'h0); //I/O as input
+	apb_write(32'hc,32'hffffffff); //set to enable generation of interrupts
+	apb_write(32'ha,32'hffff0000); 
+	apb_write(32'h1c,32'h0); //clear interrupt status register
+	apb_write(32'h18,2'b01); //interrupt mode
+	
+	io_pad_inputs(32'h87654321);
+	apb_write(32'h0,32'hff);
+	apb_read(32'h0);
+	
+	apb_write(32'h24,32'h0000f0f0);
+	apb_write(32'h20,32'h0000ffff); //external clk
+	
+
+
+	apb_read(32'h1c); //interrupt status*/
+	//wait(irq) //if interrupt generate read RGPIO_IN
+	//apb_read(32'h0); //value available in prdata
+	//apb_write(32'h1c,32'h0);
+	//apb_write(32'h18,2'b00);
+/*
+	repeat(50)
+	begin
+		#10;
+		apb_write($random,$random);
+		apb_read($random);
+		//cntrl($random,$random,$random);
+		io_pad_inputs($random);
+	//	in_pad_i=$random;
+		//addr($random);
+		io_dir=1;
+		aux_in=$random;
+	end
+*/
+	
+	#100 $finish;
+end
+initial
+	$monitor("pclk=%d,prstn=%d,psel=%d,penable=%d,pwrite=%d,ext_clk_pad_i=%d,paddr=%d,pwdata=%d,aux_in=%d,pready=%d,irq=%d,prdata=%d,io_pad=%d",pclk,prstn,psel,penable,pwrite,ext_clk_pad_i,paddr,pwdata,aux_in,pready,irq,prdata,io_pad);
+
+endmodule

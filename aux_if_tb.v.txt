@@ -1,0 +1,76 @@
+module aux_if_tb();
+reg sys_clk,sys_rstn;
+reg [31:0] aux_in;
+wire [31:0] aux_out;
+aux_if DUT(sys_clk,sys_rstn,aux_in,aux_out);
+
+initial
+begin
+	sys_clk=1'b0;
+	forever
+	#5 sys_clk=~sys_clk;
+end
+
+/*task initialize;
+	begin
+		@(negedge sys_clk)
+		aux_in=0;
+	end
+endtask
+*/
+
+task reset();
+	begin
+	//	repeat(2)
+	//	begin
+		@(negedge sys_clk)
+		sys_rstn=1'b0;
+
+		@(negedge sys_clk)
+		sys_rstn=1'b1;
+//	end
+	end
+endtask
+
+task in(input [31:0] data);
+	begin
+		@(negedge sys_clk)
+		aux_in=data;
+	end
+endtask
+
+initial
+begin
+			$dumpfile("waves.vcd");
+         		$dumpvars(0,aux_if_tb);
+end
+
+
+
+initial
+	begin
+		//sys_rstn=1'b1;
+		reset;
+		aux_in=32'b0;
+		
+	
+		in(32'b1);                 #10;
+		in(32'b1111);              #10;
+		in(32'b101);		     #10;
+
+		in(32'b1010101);	     #10;
+
+		repeat(5)
+			begin
+				in($random);
+				#10;
+			end
+
+	#30 $finish;
+end
+
+initial
+	$monitor("time=%0t  | sys_rstn=%b |  sys_clk=%b |  aux_in=%d  |  aux_out=%d",$time,sys_rstn,sys_clk,aux_in,aux_out);
+
+	
+endmodule

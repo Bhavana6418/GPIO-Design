@@ -1,0 +1,88 @@
+module apb_slave_if(input pclk,prstn,psel,penable,pwrite,gpio_inta_o,
+		    input [31:0] pwdata,
+		    input [31:0] paddr,
+		    output sys_clk,sys_rstn,irq,
+		    output pready,
+		    output reg gpio_we,
+		    output [31:0] gpio_addr,
+		    output reg [31:0] prdata,
+		    output reg [31:0] gpio_data_i,
+		    input [31:0] gpio_data_o);
+
+parameter IDLE=2'b00, SETUP=2'b01, ENABLE=2'b10;
+
+reg [1:0] state,next_state;
+
+always@(posedge pclk or negedge prstn)
+	begin
+		if(!prstn)
+			state<=IDLE;
+		else
+			state<=next_state;
+	end
+
+always@(*)
+begin
+	next_state=IDLE;
+	case(state)
+		IDLE: begin
+			if((psel) & (penable))
+				next_state=ENABLE;
+			else if(psel & !penable)
+				next_state=SETUP;
+			else
+				next_state=IDLE;
+		      end
+
+		SETUP: begin
+			if ((psel) & (penable))
+				next_state=ENABLE;
+
+			else if((psel) & (!penable))
+				next_state=SETUP;
+			else 			
+				next_state=IDLE;
+		        end
+		ENABLE: begin
+			if(psel & penable)
+				next_state=ENABLE;
+			else if(psel & !penable)
+				next_state=SETUP;
+			else
+				next_state=IDLE;
+		        end
+		default: next_state=IDLE;
+	endcase
+end
+
+assign pready=penable ? 1'b1 : 1'b0;
+
+always@(*)
+begin
+	if((state==ENABLE) && (pwrite))
+	begin
+		gpio_data_i=pwdata;
+		gpio_we=1'b1;
+		prdata=32'b0;
+	end
+	else if((state==ENABLE) && (~pwrite))
+	begin
+		gpio_data_i=0;
+		gpio_we=1'b0;
+		prdata=gpio_data_o;
+	end
+	else
+	begin
+		gpio_data_i=32'b0;
+		gpio_we=1'b0;
+		prdata=32'b0;
+	end
+end
+
+
+assign irq=gpio_inta_o;
+assign gpio_addr=paddr;
+assign sys_rstn=prstn;
+assign sys_clk=pclk;
+
+endmodule

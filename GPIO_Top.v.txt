@@ -1,0 +1,26 @@
+module top(input pclk,prstn,psel,penable,pwrite,ext_clk_pad_i,
+	   input [31:0] paddr,pwdata,aux_in,
+	   output pready,irq,
+	   output [31:0] prdata,
+	   inout [31:0] io_pad);
+
+           wire sys_clk,sys_rstn,gpio_we,gpio_inta_o;
+	   wire [31:0] gpio_addr,gpio_data_i,gpio_data_o;
+
+	   wire [31:0] aux_out;
+	   
+	   wire [31:0] out_pad_o,oen_padoe_n,in_pad_i;
+
+	   wire gpio_eclk; 
+   
+aux_if AUX(.sys_clk(sys_clk),.sys_rstn(sys_rstn),.aux_in(aux_in),.aux_out(aux_out));
+
+apb_slave_if APB(.pclk(pclk),.prstn(prstn),.psel(psel),.penable(penable),.pwrite(pwrite),.pready(pready),.paddr(paddr),.pwdata(pwdata),.prdata(prdata),.irq(irq),.sys_clk(sys_clk),.sys_rstn(sys_rstn),.gpio_we(gpio_we),.gpio_addr(gpio_addr),.gpio_data_i(gpio_data_i),.gpio_inta_o(gpio_inta_o),.gpio_data_o(gpio_data_o));
+
+gpio_reg GPIO(.sys_clk(sys_clk),.sys_rstn(sys_rstn),.gpio_we(gpio_we),.gpio_addr(gpio_addr),.gpio_data_i(gpio_data_i),.gpio_inta_o(gpio_inta_o),.aux_out(aux_out),.out_pad_o(out_pad_o),.oen_padoe_n(oen_padoe_n),.in_pad_i(in_pad_i),.gpio_eclk(gpio_eclk),.gpio_data_o(gpio_data_o));
+
+io_if IO(.out_pad_o(out_pad_o),.oen_padoe_n(oen_padoe_n),.in_pad_i(in_pad_i),.io_pad(io_pad));
+
+assign gpio_eclk = ext_clk_pad_i;
+
+endmodule

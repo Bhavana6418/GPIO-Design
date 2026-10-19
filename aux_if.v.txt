@@ -1,0 +1,13 @@
+module aux_if(sys_clk,sys_rstn,aux_in,aux_out);
+	      input sys_clk,sys_rstn;
+	      input [31:0] aux_in;
+	      output reg [31:0] aux_out;
+			  
+always@(posedge sys_clk or negedge sys_rstn)
+begin
+	if(!sys_rstn)
+		aux_out<=32'b0;
+	else
+		aux_out<=aux_in;
+end
+endmodule
